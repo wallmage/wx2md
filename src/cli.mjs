@@ -2,8 +2,12 @@
 // 用法：wx2md <文章链接...> [-o <文件或目录>] [--force] [--print] [--json]
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { homedir } from "node:os";
+import { extname, join, resolve } from "node:path";
 import { ArticleError, COLUMN_WIDTH, fetchArticle, fileName } from "./article.mjs";
+
+/** 默认输出目录：用户的文档目录下「公众号文章」。 */
+const DEFAULT_DIR = join(homedir(), "Documents", "公众号文章");
 
 const HELP = `wx2md — 把微信公众号文章导出为本地 Markdown
 
@@ -11,7 +15,7 @@ const HELP = `wx2md — 把微信公众号文章导出为本地 Markdown
   wx2md <链接...> [-o <文件或目录>]
 
 参数
-  -o, --out <路径>       输出文件（单个链接，需以 .md 结尾）或输出目录（默认当前目录）
+  -o, --out <路径>       输出文件（单个链接，需以 .md 结尾）或输出目录（默认文档目录下的「公众号文章」）
   -w, --image-width <宽度>  图片最大宽度，单位 px，默认 ${COLUMN_WIDTH}（公众号正文列宽）
                         写 full 表示图片和文字同宽（跟随窗口）
       --force            覆盖已存在的文件
@@ -57,7 +61,7 @@ async function targetPath(options, article) {
   if (options.out && [".md", ".markdown"].includes(extname(options.out).toLowerCase())) {
     return resolve(options.out);
   }
-  const directory = resolve(options.out ?? ".");
+  const directory = resolve(options.out ?? DEFAULT_DIR);
   await mkdir(directory, { recursive: true });
   return resolve(directory, fileName(article.title));
 }

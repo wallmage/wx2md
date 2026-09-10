@@ -77,6 +77,6 @@ log(`启动器：${cmdPath}`);
 log(`技能文件：${join(repo, "skills", "wx2md", "SKILL.md")}`);
 log("");
 log("用法：");
-log(`  macOS/Linux  "${shPath}" "<公众号链接>" -o "<输出目录>"`);
-log(`  Windows      "%USERPROFILE%\\.wx2md\\wx2md.cmd" "<公众号链接>" -o "<输出目录>"`);
+log(`  macOS/Linux  "${shPath}" "<公众号链接>"`);
+log(`  Windows      "%USERPROFILE%\\.wx2md\\wx2md.cmd" "<公众号链接>"`);
 log("安装完成。");

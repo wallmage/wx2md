@@ -35,12 +35,14 @@
 
 | 系统 | 命令 |
 | --- | --- |
-| macOS / Linux | `"$HOME/.wx2md/wx2md" "<链接>" -o "$HOME/Documents/公众号文章" --json` |
-| Windows | `"%USERPROFILE%\.wx2md\wx2md.cmd" "<链接>" -o "%USERPROFILE%\Documents\公众号文章" --json` |
+| macOS / Linux | `"$HOME/.wx2md/wx2md" "<链接>" --json` |
+| Windows | `"%USERPROFILE%\.wx2md\wx2md.cmd" "<链接>" --json` |
 
-参数：`-o <路径>` 输出目录（默认当前目录），`-w <宽度|full>` 图片最大宽度（默认 677px，公众号正文列宽），`--force` 覆盖同名文件，`--print` 只输出内容不写文件，`--json` 结构化结果。
+默认存到用户文档目录的「公众号文章」文件夹（Mac `~/Documents/公众号文章`，Windows `C:\Users\<用户名>\Documents\公众号文章`），用户指定别处再加 `-o <路径>`。
 
-多个链接可一次传入，共用一个输出目录。用户没说存哪里就用文档目录。
+参数：`-w <宽度|full>` 图片最大宽度（默认 677px，公众号正文列宽），`--force` 覆盖同名文件，`--print` 只输出内容不写文件，`--json` 结构化结果。
+
+多个链接可一次传入。
 
 ## 失败怎么处理
 
