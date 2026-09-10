@@ -1,0 +1,21 @@
+{
+  "name": "wx2md",
+  "version": "1.0.0",
+  "description": "把微信公众号文章链接导出为本地 Markdown 文档",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "wx2md": "./src/cli.mjs"
+  },
+  "scripts": {
+    "install:local": "node scripts/install.mjs"
+  },
+  "engines": {
+    "node": ">=20.3"
+  },
+  "dependencies": {
+    "linkedom": "^0.18.13",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
+  }
+}
