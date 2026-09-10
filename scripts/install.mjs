@@ -63,7 +63,7 @@ const check = 'const [a,b]=process.versions.node.split(".").map(Number);process.
 const shLauncher = `#!/bin/sh
 DIR=$(cd "$(dirname "$0")" && pwd)
 CHECK='${check}'
-for NODE in node "$DIR/runtime/node/bin/node"; do
+for NODE in node "$DIR/runtime/node/bin/node"${process.platform === "win32" ? ' "$DIR/runtime/node/node.exe"' : ""}; do
   if "$NODE" -e "$CHECK" >/dev/null 2>&1; then
     exec "$NODE" "$DIR/app/src/cli.mjs" "$@"
   fi
@@ -81,14 +81,30 @@ const cmdLauncher = [
   "echo Node 20.19+ is required. Please run the installer again. 1>&2", "exit /b 1",
   ":run", '"%NODE%" "%~dp0app\\src\\cli.mjs" %*', "exit /b %errorlevel%", "",
 ].join("\r\n");
+const psLauncher = `\uFEFF$ErrorActionPreference = 'Stop'
+$Check = '${check.replace('split(".")', 'split(/[.]/)')}'
+foreach ($Node in @('node', (Join-Path $PSScriptRoot 'runtime\\node\\node.exe'))) {
+  try {
+    & $Node -e $Check *> $null
+    if ($LASTEXITCODE -ne 0) { continue }
+  } catch { continue }
+  & $Node (Join-Path $PSScriptRoot 'app\\src\\cli.mjs') @args
+  exit $LASTEXITCODE
+}
+[Console]::Error.WriteLine('Node 20.19+ is required. Please run the installer again.')
+exit 1
+`;
 const shPath = join(home, "wx2md");
 const cmdPath = join(home, "wx2md.cmd");
+const psPath = join(home, "wx2md.ps1");
 await writeFile(shPath, shLauncher, "utf8");
 await chmod(shPath, 0o755);
 await writeFile(cmdPath, cmdLauncher, "utf8");
+await writeFile(psPath, psLauncher, "utf8");
 
 log(`启动器：${shPath}`);
 log(`启动器：${cmdPath}`);
+log(`启动器：${psPath}`);
 log(`技能文件：${join(repo, "skills", "wx2md", "SKILL.md")}`);
 log("");
 log("用法：");

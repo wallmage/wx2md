@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { marked } from "marked";
 import TurndownService from "turndown";
 import { parseHTML } from "linkedom";
 import { fetchArticle, normalizeUrl, parseArticle } from "../src/article.mjs";
@@ -110,4 +111,60 @@ test("nested layout tables preserve an originally narrow image", () => {
   const body = '<table><tr><td><table><tr><td><img data-src="https://example.com/narrow.jpg" data-w="60"></td></tr></table></td></tr></table>';
   const article = parseArticle(page(body), url, { imageWidth: 100 });
   assert.equal(parseHTML(article.markdown).document.querySelector("img").getAttribute("width"), "60");
+});
+
+
+test("simple tables retain their existing Markdown bytes", () => {
+  assert.equal(parseArticle(page('<table><tr><th>项目</th><th>数值</th></tr><tr><td>苹果</td><td>10</td></tr></table>'), url).markdown,
+    '| 项目 | 数值 |\n| --- | --- |\n| 苹果 | 10 |');
+});
+
+test("table pipes and backslashes preserve cell text when rendered", () => {
+  for (const value of ['a | b', String.raw`a \| b`, String.raw`a \\| b`, '<code>a | b</code>', String.raw`<code>a \| b</code>`, '<strong>a | b</strong>']) {
+    const body = `<table><tr><th>运算符</th><th>用途</th></tr><tr><td>${value}</td><td>按位或</td></tr></table>`;
+    const markdown = parseArticle(page(body), url).markdown;
+    const rendered = parseHTML(marked.parse(markdown)).document;
+    assert.deepEqual(Array.from(rendered.querySelectorAll('tbody td'), n => n.textContent),
+      [parseHTML(`<span>${value}</span>`).document.querySelector('span').textContent, '按位或'], markdown);
+  }
+});
+
+test("multiline and image cells retain their row and column", () => {
+  for (const value of ['第一行<br>第二行', '<p>第一段</p><p>第二段</p>', '<img data-src="https://example.com/a.jpg" data-w="1080">']) {
+    const body = `<table><tr><th>项目</th><th>说明</th></tr><tr><td>${value}</td><td>解释</td></tr></table>`;
+    const markdown = parseArticle(page(body), url, { imageWidth: 100 }).markdown;
+    const rendered = parseHTML(marked.parse(markdown)).document;
+    const rows = rendered.querySelectorAll('tr');
+    assert.equal(rows.length, 2, markdown);
+    assert.equal(rows[1].querySelectorAll('td').length, 2, markdown);
+    assert.equal(rows[1].lastElementChild.textContent, '解释');
+    if (value.startsWith('<img')) assert.equal(rows[1].firstElementChild.querySelector('img').getAttribute('width'), '100');
+    else assert.match(rows[1].firstElementChild.textContent, /第一[行段]\s*第二[行段]/);
+  }
+});
+
+test("merged tables retain HTML structure and image sizing", () => {
+  const body = '<table><tr><th colspan="2">合并标题</th></tr><tr><td><img data-src="https://example.com/a?x=1&amp;y=2" data-w="60"></td><td>不能丢失</td></tr></table>';
+  for (const imageWidth of [100, 677, 'full']) {
+    const markdown = parseArticle(page(body), url, { imageWidth }).markdown;
+    const rendered = parseHTML(marked.parse(markdown)).document;
+    assert.equal(rendered.querySelector('th').getAttribute('colspan'), '2', markdown);
+    assert.equal(rendered.querySelectorAll('td').length, 2);
+    assert.equal(rendered.querySelectorAll('td')[1].textContent, '不能丢失');
+    const image = rendered.querySelector('td img');
+    assert.equal(image.getAttribute('width'), imageWidth === 'full' ? null : '60');
+    assert.match(image.getAttribute('style'), /width:100%/);
+    assert.equal(image.getAttribute('src'), 'https://example.com/a?x=1&y=2');
+  }
+});
+
+test("block content inside a table retains its structure", () => {
+  for (const cell of ['<pre><code>first\n\nsecond</code></pre>', '<blockquote>引文</blockquote>', '<ul><li>第一项</li><li>第二项</li></ul>']) {
+    const markdown = parseArticle(page(`<table><tr><th>内容</th><th>说明</th></tr><tr><td>${cell}</td><td>保留</td></tr></table>`), url).markdown;
+    const doc = parseHTML(marked.parse(markdown)).document;
+    const original = parseHTML(`<div>${cell}</div>`).document.querySelector('div');
+    assert.equal(doc.querySelectorAll('tbody td').length, 2, markdown);
+    assert.equal(doc.querySelector('td').textContent, original.textContent, markdown);
+    assert.equal(doc.querySelector('td').firstElementChild.tagName, original.firstElementChild.tagName);
+  }
 });

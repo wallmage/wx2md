@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -37,6 +38,34 @@ test("reinstall repairs a missing dependency and produces a working launcher", a
   const help = () => spawnSync(launcher, ["--help"], { encoding: "utf8", shell: process.platform === "win32" });
   assert.equal(help().status, 0);
   assert.match(help().stdout, /wx2md/);
+  if (process.platform === "win32") {
+    // A fixture CLI records the exact arguments forwarded by the real generated launchers.
+    await writeFile(join(home, "app/src/cli.mjs"), 'console.log(JSON.stringify(process.argv.slice(2)))');
+    const forwarded = ['https://mp.weixin.qq.com/s?__biz=abc&mid=123&idx=1&sn=def&name=中文 空格', '-n', '标题 空格 & = 值', '--json'];
+    const runtime = join(home, 'runtime/node');
+    await mkdir(runtime, { recursive: true });
+    await cp(process.execPath, join(runtime, 'node.exe'));
+    for (const shell of ['powershell', 'pwsh']) {
+      const version = spawnSync(shell, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], { encoding: 'utf8' });
+      await t.test(`${shell} ${version.stdout?.trim()} forwards complete URLs and spaces`, { skip: version.status !== 0 }, async () => {
+        const harness = join(home, 'forward.ps1');
+        const launcher = join(home, 'wx2md.ps1');
+        const env = { ...process.env, WX2MD_TEST_ARGS: JSON.stringify(forwarded), WX2MD_TEST_LAUNCHER: launcher, WX2MD_TEST_SHELL: shell };
+        for (const command of ['& $env:WX2MD_TEST_LAUNCHER @forwarded', '& $env:WX2MD_TEST_SHELL -NoProfile -ExecutionPolicy Bypass -File $env:WX2MD_TEST_LAUNCHER @forwarded', '$env:PATH = [Environment]::SystemDirectory\n& $env:WX2MD_TEST_LAUNCHER @forwarded']) {
+          await writeFile(harness, `\uFEFF$ErrorActionPreference = 'Stop'\n$forwarded = @(ConvertFrom-Json $env:WX2MD_TEST_ARGS)\n${command}\nexit $LASTEXITCODE\n`);
+          const result = spawnSync(shell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', harness], { env, encoding: 'utf8' });
+          assert.equal(result.status, 0, result.stdout + result.stderr);
+          assert.deepEqual(JSON.parse(result.stdout), forwarded);
+        }
+      });
+    }
+    const bash = join(process.env.ProgramFiles, 'Git/bin/bash.exe');
+    await t.test('Git Bash uses portable Windows Node without system Node', { skip: !existsSync(bash) }, async () => {
+      const result = spawnSync(bash, ['--noprofile', '--norc', '-c', 'PATH=/usr/bin:/bin\nexec "$1" "$2" -n "$3" --json', 'wx2md-test', join(home, 'wx2md').replaceAll('\\', '/'), forwarded[0], forwarded[2]], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.deepEqual(JSON.parse(result.stdout), forwarded);
+    });
+  }
   if (process.platform !== "win32") {
     const runtime = join(home, "runtime/node/bin");
     await mkdir(runtime, { recursive: true });
@@ -75,10 +104,11 @@ async function bootstrap(t, { existing = false, downloadFails = false, usable = 
   assert.equal(spawnSync("tar", ["-czf", join(home, "node.tar.gz"), "-C", home, "node-v22.23.2-darwin-arm64"]).status, 0);
   await writeFile(join(bin, "uname"), '#!/bin/sh\nif [ "$1" = "-s" ]; then echo Darwin; else echo arm64; fi\n', { mode: 0o755 });
   await writeFile(join(bin, "curl"), `#!/bin/sh\nfor arg do target="$arg"; done\ncase "$target" in\n */index.json) echo '[{"version":"v22.23.2"}]';;\n *) ${downloadFails ? "exit 22" : 'exec /bin/cat "$HOME/node.tar.gz"'};;\nesac\n`, { mode: 0o755 });
-  if (switchFails) await writeFile(join(bin, "mv"), '#!/bin/sh\ncase "$1" in */node-v*) exit 42;; esac\nexec /bin/mv "$@"\n', { mode: 0o755 });
+  if (switchFails) await writeFile(join(bin, "mv"), '#!/bin/sh\ncase "$1" in */node-v*) touch "$HOME/move-injected"; exit 42;; esac\nexec /bin/mv "$@"\n', { mode: 0o755 });
   const result = spawnSync("/bin/bash", [join(repo, "scripts/install.sh")], {
     env: { ...process.env, HOME: home, WX2MD_HOME: join(home, ".wx2md"), PATH: `${bin}:/usr/bin:/bin`, LC_ALL: "en_US.UTF-8" }, encoding: "utf8",
   });
+  if (switchFails) assert.ok(existsSync(join(home, "move-injected")), "test harness did not intercept mv");
   return { result, runtime };
 }
 

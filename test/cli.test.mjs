@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, open, readdir, readFile, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -103,4 +104,38 @@ test("30000 Han characters plus 80 images survive stdout pipes and file export",
     assert.equal(Buffer.byteLength(document), Buffer.byteLength(expected));
     assert.equal(document, expected);
   }
+});
+
+
+test("closing a print pipe early exits quietly", { skip: process.platform === 'win32' }, () => {
+  for (const flags of ['--print', '--print --json']) {
+    const result = spawnSync('/bin/bash', ['-c', `set -o pipefail; "$TEST_NODE" --import "$TEST_PRELOAD" "$TEST_CLI" "$TEST_URL" ${flags} | head -1`], {
+      env: { ...process.env, TEST_LONG: '1', TEST_NODE: process.execPath, TEST_PRELOAD: `data:text/javascript,${encodeURIComponent(mock)}`, TEST_CLI: cli, TEST_URL: urls[0] }, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+  }
+});
+
+test("a real stdout write failure stays nonzero and reports the error", { skip: process.platform === 'win32' }, async (t) => {
+  const full = existsSync('/dev/full');
+  const path = full ? '/dev/full' : join(await output(t), 'read-only');
+  if (!full) { const file = await open(path, 'w'); await file.close(); }
+  const file = await open(path, full ? 'w' : 'r');
+  try {
+    const result = spawnSync(process.execPath, [cli, '--help'], { stdio: ['ignore', file.fd, 'pipe'], encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ENOSPC|EBADF/);
+    assert.doesNotMatch(result.stderr, /Unhandled/);
+  } finally { await file.close(); }
+});
+
+
+test("an earlier article failure remains nonzero when a later pipe closes", { skip: process.platform === 'win32' }, () => {
+  const result = spawnSync('/bin/bash', ['-c', 'set -o pipefail; "$TEST_NODE" --import "$TEST_PRELOAD" "$TEST_CLI" invalid "$TEST_URL" --print | head -1'], {
+    env: { ...process.env, TEST_LONG: '1', TEST_NODE: process.execPath, TEST_PRELOAD: `data:text/javascript,${encodeURIComponent(mock)}`, TEST_CLI: cli, TEST_URL: urls[0] }, encoding: 'utf8',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /invalid/);
+  assert.doesNotMatch(result.stderr, /Unhandled|EPIPE/);
 });

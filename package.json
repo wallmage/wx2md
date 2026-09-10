@@ -18,5 +18,8 @@
     "linkedom": "^0.18.13",
     "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2"
+  },
+  "devDependencies": {
+    "marked": "18.0.12"
   }
 }

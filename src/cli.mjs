@@ -5,6 +5,12 @@ import { homedir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
 import { ArticleError, COLUMN_WIDTH, fetchArticle, fileName, shortTitle } from "./article.mjs";
 
+process.stdout.on("error", (error) => {
+  if (error.code === "EPIPE") process.exit(process.exitCode || 0);
+  process.exitCode = 1;
+  process.stderr.write(`输出失败（${error.code ?? "UNKNOWN"}）：${error.message}\n`);
+});
+
 /** 默认输出目录：用户的文档目录下「公众号文章」。 */
 const DEFAULT_DIR = join(homedir(), "Documents", "公众号文章");
 
@@ -123,6 +129,7 @@ async function run(argv) {
       });
     } catch (cause) {
       failed += 1;
+      process.exitCode = 1;
       const error = cause instanceof Error ? cause : new Error(String(cause));
       results.push({ source: String(input), error: error.message, code: error.code ?? "UNKNOWN" });
       if (!options.json) process.stderr.write(`失败 ${input}：${error.message}\n`);
@@ -141,7 +148,7 @@ async function run(argv) {
 }
 
 run(process.argv.slice(2)).then(
-  (code) => { process.exitCode = code; },
+  (code) => { process.exitCode ||= code; },
   (cause) => {
     if (process.argv.slice(2).includes("--json")) {
       process.stdout.write(`${JSON.stringify({ error: cause.message, code: cause.code ?? "UNKNOWN" })}\n`);

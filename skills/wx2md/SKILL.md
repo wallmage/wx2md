@@ -18,7 +18,7 @@ macOS / Linux：
 Windows（PowerShell）：
 
 ```powershell
-& "$env:USERPROFILE\.wx2md\wx2md.cmd" "<文章链接>" -n "<短标题>" --json
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.wx2md\wx2md.ps1" "<文章链接>" -n "<短标题>" --json
 ```
 
 首次使用前，先跑一次本仓库的 `scripts/install.sh`（Windows 用 `scripts/install.ps1`）。

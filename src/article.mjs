@@ -24,6 +24,13 @@ function imageTag(node, imageWidth) {
 }
 
 function createTurndown(imageWidth) {
+  const keepTable = (_content, node) => {
+    const kept = node.cloneNode(true);
+    for (const image of Array.from(kept.querySelectorAll("img"))) image.outerHTML = imageTag(image, imageWidth);
+    // 避免 HTML 内的空行提前结束 Markdown 的 HTML 块，保留代码中的原换行。
+    const html = kept.outerHTML.replace(/\n(?=[ \t]*\n)/g, "&#10;");
+    return `\n\n${html}\n\n`;
+  };
   const service = new TurndownService({
     headingStyle: "atx",
     hr: "---",
@@ -32,14 +39,27 @@ function createTurndown(imageWidth) {
     emDelimiter: "*",
     strongDelimiter: "**",
     linkStyle: "inlined",
-    keepReplacement: (_content, node) => {
-      // GFM 保留无表头表格的原 HTML，不使用子节点的转换结果。
-      const kept = node.cloneNode(true);
-      for (const image of Array.from(kept.querySelectorAll("img"))) image.outerHTML = imageTag(image, imageWidth);
-      return `\n\n${kept.outerHTML}\n\n`;
-    },
+    keepReplacement: keepTable,
   });
   service.use(gfm);
+  service.addRule("complexTable", {
+    filter: (node) => node.nodeName === "TABLE" && (
+      node.querySelector("table, caption, [colspan], [rowspan], pre, blockquote, ul, ol, h1, h2, h3, h4, h5, h6") ||
+      node.querySelectorAll("thead tr").length > 1 ||
+      Array.from(node.querySelectorAll("code")).some((code) => code.textContent.includes("|")) ||
+      Array.from(node.rows).some((row) => row.cells.length !== node.rows[0].cells.length)
+    ),
+    replacement: keepTable,
+  });
+  service.addRule("tableCell", {
+    filter: ["th", "td"],
+    replacement: (content, node) => {
+      // 单元格不能含 Markdown 的真换行；Turndown 已转义普通文字中的反斜杠。
+      const inline = content.includes("\n") ? content.trim().replace(/\n+/g, "<br>") : content;
+      const prefix = node === node.parentNode.firstChild ? "| " : " ";
+      return prefix + inline.replace(/\|/g, "\\|") + " |";
+    },
+  });
   service.remove(["script", "style", "noscript", "iframe"]);
   // 默认的 ![]() 无法控制宽度，宽屏下图片会按原始尺寸撑开，改成受列宽约束的 <img>
   service.addRule("image", {

@@ -26,7 +26,7 @@
 
 1. **装**：macOS / Linux 跑 `bash scripts/install.sh`，Windows 跑 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1`。脚本准备 Node 20.19+ 并同步 npm 依赖；npm 默认源失败会换国内镜像重试。
 2. **注册 `/` 命令**：把 `skills/wx2md/SKILL.md` 复制到本工具自己的 skill 目录——Claude Code 用 `~/.claude/skills/wx2md/`，WorkBuddy 用 `~/.workbuddy/skills/wx2md/`，其他工具放进它自家的位置，找不到就跳过这步。
-3. **验证**：跑 `~/.wx2md/wx2md --help`（Windows 用 `%USERPROFILE%\.wx2md\wx2md.cmd --help`），能打出帮助即可用。
+3. **验证**：跑 `~/.wx2md/wx2md --help`（Windows PowerShell 用 `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.wx2md\wx2md.ps1" --help`），能打出帮助即可用。
 4. **告诉用户**（先取到用户真实用户目录：Mac 跑 `echo $HOME`，Windows 跑 `echo $env:USERPROFILE`，拼出 `…/Documents/公众号文章`，照下面原话说）：
    > 装好了。你复制粘贴微信链接给我，我会帮你导出干净的 MD 文件，默认存放在：
    > `/Users/例子/Documents/公众号文章`
@@ -42,7 +42,8 @@
 | 系统 | 命令 |
 | --- | --- |
 | macOS / Linux | `"$HOME/.wx2md/wx2md" "<链接>" -n "<短标题>" --json` |
-| Windows | `"%USERPROFILE%\.wx2md\wx2md.cmd" "<链接>" -n "<短标题>" --json` |
+| Windows PowerShell | `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.wx2md\wx2md.ps1" "<链接>" -n "<短标题>" --json` |
+| Windows cmd.exe | `"%USERPROFILE%\.wx2md\wx2md.cmd" "<链接>" -n "<短标题>" --json` |
 
 **文件名**：默认存到用户文档目录的「公众号文章」文件夹，文件名 = 当天日期 + 短标题，如 `20260910-ChatGPT+WorkBuddy 做 PPT 技巧.md`。
 
