@@ -141,13 +141,13 @@ async function run(argv) {
 }
 
 run(process.argv.slice(2)).then(
-  (code) => process.exit(code),
+  (code) => { process.exitCode = code; },
   (cause) => {
     if (process.argv.slice(2).includes("--json")) {
       process.stdout.write(`${JSON.stringify({ error: cause.message, code: cause.code ?? "UNKNOWN" })}\n`);
     } else {
       process.stderr.write(`${cause.message}\n`);
     }
-    process.exit(1);
+    process.exitCode = 1;
   },
 );

@@ -32,6 +32,12 @@ function createTurndown(imageWidth) {
     emDelimiter: "*",
     strongDelimiter: "**",
     linkStyle: "inlined",
+    keepReplacement: (_content, node) => {
+      // GFM 保留无表头表格的原 HTML，不使用子节点的转换结果。
+      const kept = node.cloneNode(true);
+      for (const image of Array.from(kept.querySelectorAll("img"))) image.outerHTML = imageTag(image, imageWidth);
+      return `\n\n${kept.outerHTML}\n\n`;
+    },
   });
   service.use(gfm);
   service.remove(["script", "style", "noscript", "iframe"]);
@@ -44,8 +50,8 @@ function createTurndown(imageWidth) {
 }
 
 export class ArticleError extends Error {
-  constructor(code, message) {
-    super(message);
+  constructor(code, message, options) {
+    super(message, options);
     this.name = "ArticleError";
     this.code = code;
   }
@@ -190,10 +196,17 @@ export function parseArticle(html, url, { imageWidth = COLUMN_WIDTH } = {}) {
       image.removeAttribute("style");
       image.removeAttribute("data-src");
     }
+    for (const table of body.querySelectorAll("table")) {
+      if (!table.querySelector("tr")) table.replaceWith(...table.childNodes);
+    }
     const count = Array.from(body.textContent.replace(/\s/g, "")).length;
     const hasImage = Array.from(body.querySelectorAll("img")).some((image) => image.getAttribute("src")?.trim());
     if (count > 0 || hasImage) {
-      markdown = turndown.turndown(body.innerHTML).trim();
+      try {
+        markdown = turndown.turndown(body.innerHTML).trim();
+      } catch (cause) {
+        throw new ArticleError("CONVERT_FAILED", "正文转换失败，请保留原文链接并反馈", { cause });
+      }
       characters = count;
       break;
     }

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import TurndownService from "turndown";
 import { parseHTML } from "linkedom";
 import { fetchArticle, normalizeUrl, parseArticle } from "../src/article.mjs";
 
@@ -73,4 +74,40 @@ test("URL restrictions remain enforced", () => {
   for (const input of ["http://mp.weixin.qq.com/s/test", "https://example.com/s/test", "https://mp.weixin.qq.com:444/s/test", "https://user@mp.weixin.qq.com/s/test"]) {
     assert.throws(() => normalizeUrl(input), { code: "URL_INVALID" });
   }
+});
+
+test("zero-row tables cannot break the surrounding article", () => {
+  for (const table of ["<table></table>", "<table><tbody></tbody></table>"]) {
+    assert.equal(parseArticle(page(`前文${table}后文`), url).markdown.replace(/\s/g, ""), "前文后文");
+  }
+});
+
+test("images inside retained and Markdown tables honor width and preserve URLs", () => {
+  const src = 'https://example.com/a?x="quoted"&literal=&copy;';
+  const img = '<img data-src="https://example.com/a?x=&quot;quoted&quot;&amp;literal=&amp;copy;" data-w="1080" style="width:1080px">';
+  for (const heading of ["", "<tr><th>表头</th></tr>"]) {
+    for (const width of [100, 677, "full"]) {
+      const article = parseArticle(page(`<table>${heading}<tr><td>${img}</td></tr></table>`), url, { imageWidth: width });
+      const image = parseHTML(article.markdown).document.querySelector("img");
+      assert.equal(image.getAttribute("src"), src);
+      assert.equal(image.getAttribute("width"), width === "full" ? null : String(width));
+      assert.match(image.getAttribute("style"), /width:100%;/);
+      if (width !== "full") assert.match(image.getAttribute("style"), new RegExp(`max-width:${width}px`));
+      assert.equal(article.characters, heading ? 2 : 0);
+      if (heading) assert.match(article.markdown, /---/);
+      else assert.match(article.markdown, /<table>/);
+    }
+  }
+});
+
+test("conversion failures report an article error and retain the original cause", (t) => {
+  const cause = new Error("converter failed");
+  t.mock.method(TurndownService.prototype, "turndown", () => { throw cause; });
+  assert.throws(() => parseArticle(page("正文"), url), (error) => error.code === "CONVERT_FAILED" && error.cause === cause);
+});
+
+test("nested layout tables preserve an originally narrow image", () => {
+  const body = '<table><tr><td><table><tr><td><img data-src="https://example.com/narrow.jpg" data-w="60"></td></tr></table></td></tr></table>';
+  const article = parseArticle(page(body), url, { imageWidth: 100 });
+  assert.equal(parseHTML(article.markdown).document.querySelector("img").getAttribute("width"), "60");
 });

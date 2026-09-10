@@ -59,8 +59,28 @@ if (!ok) {
   process.exit(1);
 }
 
-const shLauncher = `#!/bin/sh\nDIR=$(cd "$(dirname "$0")" && pwd)\nNODE="$DIR/runtime/node/bin/node"\n[ -x "$NODE" ] || NODE="$DIR/runtime/node/node.exe"\n[ -x "$NODE" ] || NODE=node\nexec "$NODE" "$DIR/app/src/cli.mjs" "$@"\n`;
-const cmdLauncher = `@echo off\r\nsetlocal\r\nset NODE=%~dp0runtime\\node\\node.exe\r\nif not exist "%NODE%" set NODE=node\r\n"%NODE%" "%~dp0app\\src\\cli.mjs" %*\r\n`;
+const check = 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>20||(a===20&&b>=19)?0:1)';
+const shLauncher = `#!/bin/sh
+DIR=$(cd "$(dirname "$0")" && pwd)
+CHECK='${check}'
+for NODE in node "$DIR/runtime/node/bin/node"; do
+  if "$NODE" -e "$CHECK" >/dev/null 2>&1; then
+    exec "$NODE" "$DIR/app/src/cli.mjs" "$@"
+  fi
+done
+echo "需要可用的 Node 20.19+，请重新运行安装脚本。" >&2
+exit 1
+`;
+const cmdLauncher = [
+  "@echo off", "setlocal", "set NODE=node",
+  `node -e "${check.replaceAll('"', "'")}" >nul 2>&1`,
+  "if not errorlevel 1 goto run",
+  'set "NODE=%~dp0runtime\\node\\node.exe"',
+  `"%NODE%" -e "${check.replaceAll('"', "'")}" >nul 2>&1`,
+  "if not errorlevel 1 goto run",
+  "echo Node 20.19+ is required. Please run the installer again. 1>&2", "exit /b 1",
+  ":run", '"%NODE%" "%~dp0app\\src\\cli.mjs" %*', "exit /b %errorlevel%", "",
+].join("\r\n");
 const shPath = join(home, "wx2md");
 const cmdPath = join(home, "wx2md.cmd");
 await writeFile(shPath, shLauncher, "utf8");

@@ -71,6 +71,7 @@ YAML 头信息（title、account、author、published、source）+ 正文 Markdo
 
 - `WECHAT_CHALLENGE`：微信要求验证。请用户在浏览器打开链接完成验证后重试。
 - `CONTENT_MISSING`：页面没有返回正文（链接失效或纯 JS 渲染页面）。如实告知用户。
+- `CONVERT_FAILED`：正文转换失败。保留原文链接并反馈，不要把它解释成网络或付费问题。
 - `EXISTS`：文件已存在。确认后用 `--force` 重跑。
 - `PATH_CONFLICT`：本批次文件名冲突。用不同短标题分别导出；`--force` 也不会覆盖本批次刚导出的文章。
 - `state: partial`：付费文章，拿到的是试读部分，回复时说明。

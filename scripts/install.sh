@@ -30,14 +30,27 @@ VERSION=$(curl -fsSL --max-time 20 https://nodejs.org/dist/index.json 2>/dev/nul
 
 mkdir -p "$RUNTIME"
 STAGING=$(mktemp -d "$RUNTIME/.download.XXXXXX")
-trap 'rm -rf "$STAGING"' EXIT
+cleanup() {
+  status=$?
+  trap - EXIT
+  if [ -d "$STAGING/previous" ] && [ ! -e "$RUNTIME/node" ]; then
+    mv "$STAGING/previous" "$RUNTIME/node" || {
+      echo "恢复失败，旧运行时保留在 $STAGING/previous" >&2
+      exit 1
+    }
+  fi
+  rm -rf "$STAGING"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 echo "本机没有可用的 Node，正在下载便携版 Node ${VERSION}（约 40MB）…"
 curl -fsSL "https://nodejs.org/dist/$VERSION/node-$VERSION-$PLATFORM-$ARCH.tar.gz" > "$STAGING/node.tar.gz"
 tar -xzf "$STAGING/node.tar.gz" -C "$STAGING"
 "$STAGING/node-$VERSION-$PLATFORM-$ARCH/bin/node" -e "$MIN_CHECK"
-rm -rf "$RUNTIME/node"
+[ ! -e "$RUNTIME/node" ] || mv "$RUNTIME/node" "$STAGING/previous"
 mv "$STAGING/node-$VERSION-$PLATFORM-$ARCH" "$RUNTIME/node"
 rm -rf "$STAGING"
-trap - EXIT
+trap - EXIT HUP INT TERM
 
 exec "$RUNTIME/node/bin/node" "$REPO/scripts/install.mjs" "$@"
