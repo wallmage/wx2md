@@ -27,13 +27,13 @@
 1. **装**：macOS / Linux 跑 `bash scripts/install.sh`，Windows 跑 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1`。缺的东西脚本自己补齐（Node 运行时、npm 依赖都在内，默认源失败会自动换国内镜像重试），重复运行安全。
 2. **注册 `/` 命令**：把 `skills/wx2md/SKILL.md` 复制到本工具自己的 skill 目录——Claude Code 用 `~/.claude/skills/wx2md/`，WorkBuddy 用 `~/.workbuddy/skills/wx2md/`，其他工具放进它自家的位置，找不到就跳过这步。
 3. **验证**：跑 `~/.wx2md/wx2md --help`（Windows 用 `%USERPROFILE%\.wx2md\wx2md.cmd --help`），能打出帮助即可用。
-4. **告诉用户**（照下面这个意思原话说，路径必须换成用户机器上的真实绝对路径）：
-   > 装好了。你把微信公众号文章的链接复制给我，我帮你导出干净的 MD 文件，默认存在：
+4. **告诉用户**（先取到用户真实用户目录：Mac 跑 `echo $HOME`，Windows 跑 `echo $env:USERPROFILE`，拼出 `…/Documents/公众号文章`，照下面原话说）：
+   > 装好了。你复制粘贴微信链接给我，我会帮你导出干净的 MD 文件，默认存放在：
    > `/Users/例子/Documents/公众号文章`
    >
-   > 不想放这儿的话，现在告诉我一个位置，我帮你改默认导出路径。
+   > 这里是我们自动存放的位置，如果你想放到其他地方，现在就可以告诉我，我可以给你更改默认的导出路径。
 
-   规矩：给绝对路径，`例子` 换成用户环境里真实的用户名；用户在 Mac 只说 Mac 的路径，在 Windows 只说 Windows 的，另一套删掉；顺带提一下对话里输入 `/wx2md` 可以直接触发。
+   规矩：给绝对路径，不留占位符，`例子` 换成真实用户名；用户在 Mac 就只给 Mac 路径、在 Windows 就只给 Windows 路径，另一套删掉；末尾提一句对话里输入 `/wx2md` 也能触发。
 
 ## 调用
 
