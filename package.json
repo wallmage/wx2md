@@ -8,10 +8,11 @@
     "wx2md": "./src/cli.mjs"
   },
   "scripts": {
+    "test": "node --test",
     "install:local": "node scripts/install.mjs"
   },
   "engines": {
-    "node": ">=20.3"
+    "node": ">=20.19.0"
   },
   "dependencies": {
     "linkedom": "^0.18.13",

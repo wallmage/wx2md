@@ -7,15 +7,12 @@ import { gfm } from "turndown-plugin-gfm";
 const USER_AGENT = "WeRead/2.1.2 WRBrand/Onyx wr_eink"; // 微信读书墨水屏 UA，公众号页面按普通网页返回
 const TIMEOUT_MS = 20_000;
 const MAX_BYTES = 10 * 1024 * 1024;
-const MIN_CHARS = 200;
 export const COLUMN_WIDTH = 677; // 公众号正文列宽，图片按它收敛，保证和原文一样的比例
 const BLOCKED = /(?:访问过于频繁|环境异常|异常访问|操作频繁|请在微信客户端打开链接|需要验证|安全验证)/;
-const CLOUDFLARE = /(?:cf-chl-|challenge-platform|just a moment|attention required.{0,20}cloudflare)/i;
-const PAYWALL = /(?:付费后阅读|购买后阅读|付费内容|试看)/;
 
 /** 图片标签：原文自己就窄的图保持原尺寸，宽图收敛到列宽，居中。 */
 function imageTag(node, imageWidth) {
-  const src = node.getAttribute("src");
+  const src = node.getAttribute("src")?.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   if (!src) return "";
   if (imageWidth === "full") {
     return `\n<img src="${src}" alt="" style="width:100%;height:auto;display:block;margin:1.2em auto">\n`;
@@ -136,12 +133,16 @@ function fromScript(html, name) {
   const quoted = new RegExp(`var\\s+${name}\\s*=\\s*("|')([\\s\\S]*?)\\1`).exec(html);
   if (quoted) return quoted[2].trim();
   const decoded = new RegExp(`var\\s+${name}\\s*=\\s*htmlDecode\\("([\\s\\S]*?)"\\)`).exec(html);
-  return decoded ? decoded[1].trim() : "";
+  if (decoded) return decoded[1].trim();
+  const numeric = new RegExp(`var\\s+${name}\\s*=\\s*(\\d+)\\s*(?:;|$)`).exec(html);
+  return numeric ? numeric[1] : "";
 }
 
 /** Unix 秒/毫秒 -> 北京时间字符串，与本机时区无关。 */
 function beijingTime(value) {
-  const seconds = Number(String(value ?? "").replace(/[^\d]/g, ""));
+  const raw = String(value ?? "").trim();
+  if (!/^(?:\d{10}|\d{13})$/.test(raw)) return "";
+  const seconds = Number(raw);
   if (!Number.isSafeInteger(seconds) || seconds <= 0) return "";
   const ms = seconds < 1_000_000_000_000 ? seconds * 1000 : seconds;
   const parts = new Intl.DateTimeFormat("zh-CN", {
@@ -165,24 +166,35 @@ function yaml(value) {
 /** 从页面 HTML 中取出标题、公众号、作者、发布时间与正文 Markdown。 */
 export function parseArticle(html, url, { imageWidth = COLUMN_WIDTH } = {}) {
   const { document } = parseHTML(html);
-  const paywall = PAYWALL.test(html);
+  if (document.querySelector('form#challenge-form, #cf-challenge-running, script[src*="/cdn-cgi/challenge-platform/"]')) {
+    throw new ArticleError("CLOUDFLARE_CHALLENGE", "被 Cloudflare 挑战页拦截，请稍后重试");
+  }
+  const scripts = Array.from(document.querySelectorAll("script"), (node) => node.textContent).join("\n");
+  const subscription = fromScript(scripts, "isPaySubscribe") || fromScript(scripts, "is_pay_subscribe");
+  const paywall = fromScript(scripts, "need_pay") === "1" ||
+    (subscription === "1" && fromScript(scripts, "isPaid") !== "1") ||
+    !!document.querySelector('meta[itemprop="isAccessibleForFree"][content="false"]');
   const blocked = BLOCKED.test(html);
   const turndown = createTurndown(imageWidth);
 
   let markdown = "";
-  for (const selector of ["#js_content", ".rich_media_content", "#js_article"]) {
+  let characters = 0;
+  for (const selector of ["#js_content", ".rich_media_content"]) {
     const body = document.querySelector(selector);
     if (!body) continue;
+    for (const node of body.querySelectorAll("script, style, noscript, iframe")) node.remove();
     for (const image of body.querySelectorAll("img")) {
-      const lazy = image.getAttribute("data-src");
-      if (lazy) image.setAttribute("src", lazy);
+      const src = image.getAttribute("data-src") || image.getAttribute("src");
+      // linkedom 序列化属性时不转义 &，需防止 Turndown 再次解析时改变地址。
+      if (src) image.setAttribute("src", src.replace(/&/g, "&amp;"));
       image.removeAttribute("style");
       image.removeAttribute("data-src");
     }
-    const converted = turndown.turndown(body.innerHTML).trim();
-    const characters = converted.replace(/!\[\]\([^)]*\)/g, "").replace(/\s/g, "").length;
-    if (characters >= MIN_CHARS || (paywall && characters > 0)) {
-      markdown = converted;
+    const count = Array.from(body.textContent.replace(/\s/g, "")).length;
+    const hasImage = Array.from(body.querySelectorAll("img")).some((image) => image.getAttribute("src")?.trim());
+    if (count > 0 || hasImage) {
+      markdown = turndown.turndown(body.innerHTML).trim();
+      characters = count;
       break;
     }
   }
@@ -199,7 +211,7 @@ export function parseArticle(html, url, { imageWidth = COLUMN_WIDTH } = {}) {
       "CONTENT_MISSING",
       title === ""
         ? "页面没有文章正文（链接可能已失效，或该页面需要 JS 渲染，抓不到）"
-        : `正文只有不到 ${MIN_CHARS} 字，可能被截断或需要验证`,
+        : "页面没有有效正文，可能需要验证或 JS 渲染",
     );
   }
 
@@ -216,6 +228,7 @@ export function parseArticle(html, url, { imageWidth = COLUMN_WIDTH } = {}) {
     author: author === account ? "" : author,
     published,
     markdown,
+    characters,
     state: paywall ? "partial" : "complete",
     url: url.href,
   };
@@ -280,9 +293,6 @@ export async function fetchArticle(input, { signal, timeout = TIMEOUT_MS, imageW
       throw new ArticleError("TIMEOUT", `抓取超时（${timeout / 1000} 秒）`);
     }
     throw cause;
-  }
-  if (CLOUDFLARE.test(page.html)) {
-    throw new ArticleError("CLOUDFLARE_CHALLENGE", "被 Cloudflare 挑战页拦截，请稍后重试");
   }
   const article = parseArticle(page.html, page.url, { imageWidth });
   return { ...article, document: toDocument(article) };

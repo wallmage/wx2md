@@ -20,8 +20,8 @@ const has = (path) => {
 };
 
 const [major, minor] = process.versions.node.split(".").map(Number);
-if (major < 20 || (major === 20 && minor < 3)) {
-  log(`需要 Node 20.3 以上，当前 ${process.versions.node}。请改用 scripts/install.sh 或 scripts/install.ps1 安装。`);
+if (major < 20 || (major === 20 && minor < 19)) {
+  log(`需要 Node 20.19 以上，当前 ${process.versions.node}。请改用 scripts/install.sh 或 scripts/install.ps1 安装。`);
   process.exit(1);
 }
 
@@ -47,21 +47,16 @@ function runNpm(args) {
   return spawnSync(command, argv, { cwd: app, stdio: "inherit" }).status === 0;
 }
 
-const force = process.argv.includes("--force");
-if (force || !has(join(app, "node_modules", "turndown")) || !has(join(app, "node_modules", "linkedom"))) {
-  const args = ["install", "--omit=dev", "--no-audit", "--no-fund"];
-  log("安装依赖（linkedom、turndown）…");
-  let ok = runNpm(args);
-  if (!ok) {
-    log("默认源失败，换国内镜像重试…");
-    ok = runNpm([...args, "--registry=https://registry.npmmirror.com"]);
-  }
-  if (!ok) {
-    log("依赖安装失败，多半是网络问题。请重跑一次安装脚本。");
-    process.exit(1);
-  }
-} else {
-  log("依赖已存在，跳过");
+const args = ["install", "--omit=dev", "--no-audit", "--no-fund"];
+log("同步依赖…");
+let ok = runNpm(args);
+if (!ok) {
+  log("默认源失败，换国内镜像重试…");
+  ok = runNpm([...args, "--registry=https://registry.npmmirror.com"]);
+}
+if (!ok) {
+  log("依赖安装失败，多半是网络问题。请重跑一次安装脚本。");
+  process.exit(1);
 }
 
 const shLauncher = `#!/bin/sh\nDIR=$(cd "$(dirname "$0")" && pwd)\nNODE="$DIR/runtime/node/bin/node"\n[ -x "$NODE" ] || NODE="$DIR/runtime/node/node.exe"\n[ -x "$NODE" ] || NODE=node\nexec "$NODE" "$DIR/app/src/cli.mjs" "$@"\n`;

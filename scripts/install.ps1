@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Repo = Split-Path -Parent $PSScriptRoot
-$Check = 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>20||(a===20&&b>=3)?0:1)'
+$Check = 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>20||(a===20&&b>=19)?0:1)'
 
 $Node = Get-Command node -ErrorAction SilentlyContinue
 if ($Node) {

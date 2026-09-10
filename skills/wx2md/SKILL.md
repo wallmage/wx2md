@@ -27,12 +27,14 @@ Windows（PowerShell）：
 
 | 参数 | 说明 |
 | --- | --- |
-| `-n, --name <短标题>` | 文件名用的短标题，先概括再传，见下 |
-| `-o, --out <路径>` | 输出目录；以 `.md` 结尾时按文件处理（配合单个链接）。默认文档目录的「公众号文章」 |
+| `-n, --name <短标题>` | 仅用于单篇；文件名用的短标题，先概括再传，见下 |
+| `-o, --out <路径>` | 输出目录；以 `.md` 或 `.markdown` 结尾时按文件处理（配合单个链接），自动创建父目录。默认文档目录的「公众号文章」 |
 | `-w, --image-width <宽度>` | 图片最大宽度 px，默认 `677`（公众号正文列宽）；`full` 表示与文字同宽 |
 | `--force` | 覆盖已存在的同名文件 |
 | `--print` | 把内容输出到标准输出，跳过写文件 |
 | `--json` | 结构化结果：`title / account / author / published / state / path / characters` |
+
+`--print --json` 返回 JSON，正文在 `document` 字段，不写文件。可先用它阅读正文，再决定短标题。`characters` 统计正文非空白字符，不含图片地址和 Markdown 标记。
 
 ## 短标题
 
@@ -45,7 +47,7 @@ Windows（PowerShell）：
 
 ## 其他
 
-- 多个链接可以一次传入，共用一个输出目录。
+- 多个链接可以一次传入，共用一个输出目录；需要不同短标题时逐篇带 `-n` 调用。
 - 默认存到用户文档目录的「公众号文章」文件夹（Mac：`~/Documents/公众号文章`，Windows：`C:\Users\<用户名>\Documents\公众号文章`）。
 - 默认跳过同名文件；用户要求覆盖时加 `--force`。
 
@@ -70,5 +72,6 @@ YAML 头信息（title、account、author、published、source）+ 正文 Markdo
 - `WECHAT_CHALLENGE`：微信要求验证。请用户在浏览器打开链接完成验证后重试。
 - `CONTENT_MISSING`：页面没有返回正文（链接失效或纯 JS 渲染页面）。如实告知用户。
 - `EXISTS`：文件已存在。确认后用 `--force` 重跑。
+- `PATH_CONFLICT`：本批次文件名冲突。用不同短标题分别导出；`--force` 也不会覆盖本批次刚导出的文章。
 - `state: partial`：付费文章，拿到的是试读部分，回复时说明。
-- 退出码非 0 表示有链接失败；`--json` 里每条结果带 `error` 和 `code`。
+- 退出码非 0 表示参数错误或有链接失败；`--json` 中失败结果带 `error` 和 `code`，参数错误返回单个错误对象。

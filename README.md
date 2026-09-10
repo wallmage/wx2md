@@ -24,7 +24,7 @@
 
 用户把本仓库发给你时，照下面做完，全程自动：
 
-1. **装**：macOS / Linux 跑 `bash scripts/install.sh`，Windows 跑 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1`。缺的东西脚本自己补齐（Node 运行时、npm 依赖都在内，默认源失败会自动换国内镜像重试），重复运行安全。
+1. **装**：macOS / Linux 跑 `bash scripts/install.sh`，Windows 跑 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1`。脚本准备 Node 20.19+ 并同步 npm 依赖；npm 默认源失败会换国内镜像重试。
 2. **注册 `/` 命令**：把 `skills/wx2md/SKILL.md` 复制到本工具自己的 skill 目录——Claude Code 用 `~/.claude/skills/wx2md/`，WorkBuddy 用 `~/.workbuddy/skills/wx2md/`，其他工具放进它自家的位置，找不到就跳过这步。
 3. **验证**：跑 `~/.wx2md/wx2md --help`（Windows 用 `%USERPROFILE%\.wx2md\wx2md.cmd --help`），能打出帮助即可用。
 4. **告诉用户**（先取到用户真实用户目录：Mac 跑 `echo $HOME`，Windows 跑 `echo $env:USERPROFILE`，拼出 `…/Documents/公众号文章`，照下面原话说）：
@@ -53,7 +53,9 @@
 
 参数：`-w <宽度|full>` 图片最大宽度（默认 677px，公众号正文列宽），`--force` 覆盖同名文件，`--print` 只输出内容不写文件，`--json` 结构化结果，`-o <路径>` 指定别处输出。
 
-多个链接可一次传入。
+多个链接可一次传入；`-n` 仅用于单篇，需要逐篇起名时分别调用。同一批次的文件名冲突会报 `PATH_CONFLICT`，即使带 `--force` 也不会相互覆盖。
+
+`--print --json` 返回包含 `document` 正文的 JSON，不写文件。`characters` 为正文非空白字符数，不含图片地址和 Markdown 标记；参数错误也返回 JSON。
 
 ## 失败怎么处理
 
