@@ -4,7 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { extname, join, resolve } from "node:path";
-import { ArticleError, COLUMN_WIDTH, fetchArticle, fileName } from "./article.mjs";
+import { ArticleError, COLUMN_WIDTH, fetchArticle, fileName, shortTitle } from "./article.mjs";
 
 /** 默认输出目录：用户的文档目录下「公众号文章」。 */
 const DEFAULT_DIR = join(homedir(), "Documents", "公众号文章");
@@ -16,6 +16,7 @@ const HELP = `wx2md — 把微信公众号文章导出为本地 Markdown
 
 参数
   -o, --out <路径>       输出文件（单个链接，需以 .md 结尾）或输出目录（默认文档目录下的「公众号文章」）
+  -n, --name <短标题>    文件名用的短标题，越短越好，只留核心意思（默认按原文标题压缩）
   -w, --image-width <宽度>  图片最大宽度，单位 px，默认 ${COLUMN_WIDTH}（公众号正文列宽）
                         写 full 表示图片和文字同宽（跟随窗口）
       --force            覆盖已存在的文件
@@ -28,6 +29,7 @@ function parseArgv(argv) {
   const options = {
     urls: [],
     out: undefined,
+    name: undefined,
     imageWidth: COLUMN_WIDTH,
     force: false,
     print: false,
@@ -38,6 +40,7 @@ function parseArgv(argv) {
     const arg = argv[i];
     if (arg === "-h" || arg === "--help") options.help = true;
     else if (arg === "-o" || arg === "--out") options.out = argv[++i];
+    else if (arg === "-n" || arg === "--name") options.name = argv[++i];
     else if (arg === "-w" || arg === "--image-width") options.imageWidth = imageWidthOf(argv[++i]);
     else if (arg === "--force") options.force = true;
     else if (arg === "--print" || arg === "--stdout") options.print = true;
@@ -63,7 +66,7 @@ async function targetPath(options, article) {
   }
   const directory = resolve(options.out ?? DEFAULT_DIR);
   await mkdir(directory, { recursive: true });
-  return resolve(directory, fileName(article.title));
+  return resolve(directory, fileName(options.name || shortTitle(article.title)));
 }
 
 async function save(path, content, force) {

@@ -237,16 +237,34 @@ export function toDocument(article) {
   return `${front}${article.markdown.replace(/\n*$/, "")}\n`;
 }
 
+/** 砍掉标题里的口水话，只留核心意思。 */
+export function shortTitle(title, max = 15) {
+  const stripped = String(title || "")
+    .replace(/^(?:一篇文章|一图|一文|一篇|长文|深度|超全|全网最全)?\s*(?:讲清楚|讲透|说清楚|读懂|看懂|盘点|梳理|揭秘|带你了解|手把手教你|教你|如何|怎么|怎样)+/g, "")
+    .replace(/[，,。！!]?\s*(?:建议收藏|收藏备用|深度好文|干货|必看|一文就够了)$/g, "")
+    .replace(/[（(][^）)]{0,12}[）)]/g, "")
+    .trim();
+  const text = stripped || String(title || "").trim();
+  if (Array.from(text).length <= max) return text || "wx2md";
+  const cut = Array.from(text).slice(0, max).join("").replace(/[\sA-Za-z0-9]+$/, "").replace(/[和与的了在把对]+$/, "").trim();
+  return cut || Array.from(text).slice(0, max).join("").trim() || "wx2md";
+}
+
 /** 文件名安全化：去掉路径分隔符与保留字符，限制长度。 */
-export function fileName(title) {
+export function fileName(title, date = new Date()) {
   const cleaned = String(title || "")
     .replace(/[/\\:*?"<>|\u0000-\u001f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/^\.+/, "")
+    .replace(/^[-.\s]+/, "")
     .slice(0, 100)
     .trim();
-  return `${cleaned || "wx2md"}.md`;
+  const stamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  return `${stamp}-${cleaned || "wx2md"}.md`;
 }
 
 /** 抓取并解析一篇文章，返回可直接落盘的 Markdown。 */
